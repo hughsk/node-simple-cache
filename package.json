@@ -1,0 +1,12 @@
+{
+	"name"			:	"node-simple-cache",
+	"description"	:	"Simple caching for Node. Like, really simple.",
+	"url"			:	"http://github.com/hughsk/node-simple-cache",
+	"keywords"		:	["simple", "cache", "storage", "async"],
+	"author"		:	"Hugh Kennedy <hughskennedy@gmail.com>",
+	"contributors"	:	[],
+	"dependencies"	:	[],
+	"main"			:	"./simple-cache.js",
+	"version"		:	"0.1.1",
+	"engines"		:	{"node": ">= 0.4.1"},
+}
