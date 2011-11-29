@@ -2,35 +2,35 @@
  * Creates a new storage instance.
  * @constructor
  */
-var Store = function() {
+var Storage = function(options) {
 	this.storage = {};
 	this.timeouts = {};
 	this.queued = {};
 	this.queues = {};
-	this.waiting = {};
-	this.delay = 60000;
-	this.qdelay = 5000;
+	
+	options = options || {};
+	this.delay = options.delay || 60000;
 }
 
 /**
- * @function Store.get(key)
+ * @function Storage.get(key)
  * @description Retrieves the value of a stored key.
  * @param key The key to look up.
  * @returns The value stored under this key, or undefined.
  */
-Store.prototype.get = function(key) {
+Storage.prototype.get = function(key) {
 	return this.exists(key)?this.storage[key]:undefined;
 }
 
 /**
- * @function Store.set(key, value)
+ * @function Storage.set(key, value)
  * @description Sets a value under the supplied key, if it has not been set already.
  * @param key The key to look up.
  * @param value The value to set the key to.
  * @param delay (optional) How long to store the value in the cache, in seconds.
- * @returns {Store} The storage instance. 
+ * @returns {Storage} The storage instance. 
  */
-Store.prototype.set = function(key, value, delay) {
+Storage.prototype.set = function(key, value, delay) {
 	if (!this.storage[key]) {
 		var me = this;
 		this.storage[key] = value;
@@ -45,22 +45,22 @@ Store.prototype.set = function(key, value, delay) {
 }
 
 /**
- * @function Store.exists(key)
+ * @function Storage.exists(key)
  * @description Checks whether or not a key has been stored in the cache.
  * @param key The key to check.
  * @returns {Boolean}
  */
-Store.prototype.exists = function(key) {
+Storage.prototype.exists = function(key) {
 	return this.storage[key] !== undefined; 
 }
 
 /**
- * @function Store.clear(key)
+ * @function Storage.clear(key)
  * @description Unsets the value under the selected key.
  * @param key The key to unset.
- * @returns {Store} The storage instance.
+ * @returns {Storage} The storage instance.
  */
-Store.prototype.clear = function(key) {
+Storage.prototype.clear = function(key) {
 	delete this.storage[key];
 	clearTimeout(this.timeouts[key]);
 	delete this.timeouts[key];
@@ -68,13 +68,13 @@ Store.prototype.clear = function(key) {
 }
 
 /**
- * @function Store.override(key, value, delay)
+ * @function Storage.override(key, value, delay)
  * @description Overrides a currently stored value.
  * @param key The key to override.
  * @param value The new value to store in this key.
  * @param delay The new lifetime of the stored value.
  */
-Store.prototype.override = function(key, value, delay) {
+Storage.prototype.override = function(key, value, delay) {
 	this.clear(key).set(key, value, delay);
 }
 
@@ -86,12 +86,13 @@ Store.prototype.override = function(key, value, delay) {
  *  requests will be added to a queue. Once the value is set, the
  * "later" callback will be called on all pending requests.
  *
- * @function Store.async(key, first, later)
+ * @function Storage.async(key, first, later)
  * @param key The key to store the value under.
  * @param first The callback for defining the key.
  * @param later The callback for all subsequent attempts.
+ * @param delay The lifetime the value will have.
  */
-Store.prototype.async = function(key, first, later) {
+Storage.prototype.async = function(key, first, later, delay) {
 	if (this.exists(key)) {
 		later(this.get(key));
 	} else
@@ -100,7 +101,7 @@ Store.prototype.async = function(key, first, later) {
 		this.queued[key] = true;
 
 		first(function(value) {
-			master.set(key, value);
+			master.set(key, value, delay || master.delay);
 			delete master.queued[key];
 
 			if (master.queues[key]) {
@@ -117,4 +118,4 @@ Store.prototype.async = function(key, first, later) {
 	}
 }
 
-module.exports.Store = Store;
+module.exports.Storage = Storage;
