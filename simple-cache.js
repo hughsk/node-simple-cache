@@ -10,7 +10,7 @@ var Storage = function(options) {
 	
 	options = options || {};
 	this.delay = options.delay || 60000;
-}
+};
 
 /**
  * @function Storage.get(key)
@@ -20,7 +20,7 @@ var Storage = function(options) {
  */
 Storage.prototype.get = function(key) {
 	return this.exists(key)?this.storage[key]:undefined;
-}
+};
 
 /**
  * @function Storage.set(key, value)
@@ -35,14 +35,14 @@ Storage.prototype.set = function(key, value, delay) {
 		var me = this;
 		this.storage[key] = value;
 		this.timeouts[key] = setTimeout(function() {
-			console.log('clearing cache');
+			// console.log('clearing cache');
 			this.master.clear(this.key);
 		}, delay*1000 || this.delay);
 		this.timeouts[key].master = this;
 		this.timeouts[key].key = key;
 	}
 	return this;
-}
+};
 
 /**
  * @function Storage.exists(key)
@@ -52,7 +52,7 @@ Storage.prototype.set = function(key, value, delay) {
  */
 Storage.prototype.exists = function(key) {
 	return this.storage[key] !== undefined; 
-}
+};
 
 /**
  * @function Storage.clear(key)
@@ -65,7 +65,7 @@ Storage.prototype.clear = function(key) {
 	clearTimeout(this.timeouts[key]);
 	delete this.timeouts[key];
 	return this;
-}
+};
 
 /**
  * @function Storage.override(key, value, delay)
@@ -76,46 +76,107 @@ Storage.prototype.clear = function(key) {
  */
 Storage.prototype.override = function(key, value, delay) {
 	this.clear(key).set(key, value, delay);
-}
+};
 
 /**
  * Intended for situations where storing a value to the cache may
  *  depend on asynchronous functions that could overlap.
  *
- * "first" will only be called once, and in the meantime all other
+ * "get" will only be called once, and in the meantime all other
  *  requests will be added to a queue. Once the value is set, the
- * "later" callback will be called on all pending requests.
+ * The "set" callback will be called on all pending requests.
+ * "alwaysGet" decides whether or not to call get after setting the first
+ * time. Defaults to true.
+ * "perTick" how many `gets` to perform each tick. Set to 0 to perform them all at once.
  *
  * @function Storage.async(key, first, later)
  * @param key The key to store the value under.
- * @param first The callback for defining the key.
- * @param later The callback for all subsequent attempts.
+ * @param options For callbacks `get` and `set`, among other parameters
  * @param delay The lifetime the value will have.
  */
-Storage.prototype.async = function(key, first, later, delay) {
+Storage.prototype.async = function(key, options, delay) {
+	var master = this;
+
+	// Throw an error if there aren't any getters/setters
+	if (!options || (!options.set && !options.get)) {
+		throw new Error('No getters/setters provided');
+	}
+
+	// Default functionality if only get is provided
+	if (typeof options.set !== 'function') {
+		options.get(this.get(key));
+		return;
+	}
+
+	// Default functionality if only set is provided
+	if (typeof options.get !== 'function') {
+		options.set(function(value) {
+			master.set(key, value, delay || master.delay);
+		});
+		return;
+	}
+
+	// If already defined, just get it outright
 	if (this.exists(key)) {
-		later(this.get(key));
-	} else
+		options.get(this.get(key));
+		return;
+	}
+
+	// If it hasn't been queued already, this is the first and should be `set`.
 	if (!this.queued[key]) {
-		var master = this;
 		this.queued[key] = true;
 
-		first(function(value) {
-			master.set(key, value, delay || master.delay);
-			delete master.queued[key];
+		process.nextTick(function() {
+			options.set(function(value) {
+				var i, l, interval;
 
-			if (master.queues[key]) {
-				for (var i=0,l=master.queues[key].length;i<l;i++) {
-					master.queues[key][i](value);
+				if (typeof options.alwaysGet === 'undefined') {
+					options.alwaysGet = true;
 				}
-				delete master.queues[key];
-			}
+
+				master.set(key, value, delay || master.delay);
+				if (options.alwaysGet) {
+					options.get(value);
+				}
+				delete master.queued[key];
+
+				if (master.queues[key]) {
+					l = master.queues[key].length;
+					i = 0;
+					interval = setInterval(function() {
+						var a = 0,
+							b = options.perFrame > 0 ? options.perFrame : l;
+
+						if (i < l) {
+							for (a; a < b && i < l; a++) {
+								master.queues[key][i](value);
+								delete master.queues[key][i];
+								i += 1; a += 1;
+							}
+						} else {
+							clearInterval(interval);
+							delete master.queues[key];
+						}
+					}, 1);
+					// for (i = 0; i < l; i += 1) {
+					// 	(function(get, value){
+					// 		process.nextTick(function(){
+					// 			get(value);
+					// 		});
+					// 	})(master.queues[key][i], value);
+					// }
+					// delete master.queues[key];
+				}
+			});
 		});
-		
-	} else {
-		this.queues[key] = this.queues[key] || [];
-		this.queues[key].push(later);
+
+		return;
 	}
-}
+
+	// By now we know there's a getter and it should be directed
+	// to the queue. So add it for later.
+	this.queues[key] = this.queues[key] || [];
+	this.queues[key].push(options.get);
+};
 
 module.exports.Storage = Storage;

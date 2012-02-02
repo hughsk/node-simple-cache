@@ -28,12 +28,14 @@ But when requests start to pile up, calling this within a non-blocking function 
     	}
     });
 
-    //Correct
-    cache.async('hello', function(setValue) {
-    	fs.readFile('filename', function(err, data) {
-    		setValue(data);
-    		console.log(data);
-    	});
-    }, function(value) {
-    	console.log(value);
+    // Correct
+    cache.async('hello', {
+       set: function(setValue) {
+           fs.readFile('filename', function(err, data) {
+              setValue(data); 
+           });
+       },
+       get: function(value) {
+           console.log(value);
+       }
     });
