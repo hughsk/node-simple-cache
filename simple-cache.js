@@ -158,14 +158,6 @@ Storage.prototype.async = function(key, options, delay) {
 							delete master.queues[key];
 						}
 					}, 1);
-					// for (i = 0; i < l; i += 1) {
-					// 	(function(get, value){
-					// 		process.nextTick(function(){
-					// 			get(value);
-					// 		});
-					// 	})(master.queues[key][i], value);
-					// }
-					// delete master.queues[key];
 				}
 			});
 		});
